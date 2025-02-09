@@ -1,10 +1,6 @@
 name: build_master_images
 on:
-  schedule:
-    - cron: '30 2 * * * '
-  push:
-    branches:
-    - main
+  workflow_dispatch:
 
 env:
   REGISTRY_USER: ${{ github.actor }}
@@ -37,10 +33,6 @@ jobs:
         run: |
           podman login -u ${{secrets.DOCKER_HUB_USER}} -p ${{secrets.DOCKER_HUB_TOKEN}} docker.io
           docker login -u ${{secrets.DOCKER_HUB_USER}} -p ${{secrets.DOCKER_HUB_TOKEN}}
-      - name: "login quay.io"
-        run: |
-          podman login -u ${{secrets.QUAY_USER}} -p ${{secrets.QUAY_TOKEN}} quay.io
-          docker login -u ${{secrets.QUAY_USER}} -p ${{secrets.QUAY_TOKEN}} quay.io
       - run: |
           sudo apt-get update
           sudo apt-get -y install qemu-user-static buildah less git make podman clamav clamav-freshclam
@@ -56,22 +48,3 @@ jobs:
           buildah push curl-base:master "docker://ghcr.io/curl/curl-container/curl-base:master"
           buildah push curl:master "docker://ghcr.io/curl/curl-container/curl:master"
         name: 'push images to github registry'
-      - name: Install Cosign
-        uses: sigstore/cosign-installer@main
-      - name: Write signing key to disk (only needed for `cosign sign --key`)
-        run: echo "${{ secrets.COSIGN_PRIVATE_KEY }}" > cosign.key
-      - name: Sign image with a key
-        run: |
-          cosign sign -y --key cosign.key ghcr.io/curl/curl-container/curl-dev:master
-          cosign sign -y --key cosign.key ghcr.io/curl/curl-container/curl-base:master
-          cosign sign -y --key cosign.key ghcr.io/curl/curl-container/curl:master
-        env:
-          COSIGN_PASSWORD: ${{secrets.COSIGN_PASSWORD}}
-      - name: Write public key to disk
-        run: echo "${{ secrets.COSIGN_PUBLIC_KEY }}" > cosign.pub
-      - name: Verify image with public key
-        run: |
-          cosign verify --key cosign.pub ghcr.io/curl/curl-container/curl-dev:master
-          cosign verify --key cosign.pub ghcr.io/curl/curl-container/curl-base:master
-          cosign verify --key cosign.pub ghcr.io/curl/curl-container/curl:master
-
