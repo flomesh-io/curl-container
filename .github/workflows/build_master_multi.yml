@@ -6,7 +6,7 @@ on:
     branches:
     - main
   workflow_dispatch:
-  
+
 
 jobs:
   build_multi_master:
@@ -28,13 +28,17 @@ jobs:
         run: |
           podman login -u ${{secrets.DOCKER_HUB_USER}} -p ${{secrets.DOCKER_HUB_TOKEN}} docker.io
           docker login -u ${{secrets.DOCKER_HUB_USER}} -p ${{secrets.DOCKER_HUB_TOKEN}}
-      - name: 'install dev deps'
-        run: |
+      - run: |
           sudo apt-get update
-          sudo apt-get -y install buildah less git make podman qemu qemu-user-static clamav clamav-freshclam   
-      - name: 'build multi image'
-        run: buildah unshare make branch_or_ref=master release_tag=latest multibuild
-      - name: 'push release to docker hub'
-        run: |
-          buildah manifest push --format v2s2 --all localhost/curl-multi:latest "docker://docker.io/flomesh/curl:latest"
-          buildah manifest push --format v2s2 --all localhost/curl-base-multi:latest "docker://docker.io/flomesh/curl-base:latest"
+          sudo apt-get -y install qemu-user-static buildah less git make podman clamav clamav-freshclam
+        name: 'install dev deps'
+      - run: buildah unshare make branch_or_ref=master release_tag=master multibuild
+        name: 'build multi image'
+      - run: buildah unshare make dist_name=localhost/curl-multi release_tag=master test
+        name: 'test image'
+      - run: make image_name=localhost/curl-multi:master scan
+        name: 'security scan image'
+      - run: |
+          buildah manifest push --all --format v2s2 localhost/curl-base-multi:master "docker://ghcr.io/curl/curl-container/curl-base-multi:master"
+          buildah manifest push --all --format v2s2 localhost/curl-multi:master "docker://ghcr.io/curl/curl-container/curl-multi:master"
+        name: 'push multi images to github registry'
